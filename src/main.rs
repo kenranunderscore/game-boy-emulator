@@ -78,6 +78,14 @@ enum Instruction {
     ADD(ArithmeticTarget),
 }
 
+impl Instruction {
+    fn from_byte(byte: u8) -> Option<Instruction> {
+        match byte {
+            _ => None, // TODO: add instruction mapping
+        }
+    }
+}
+
 enum ArithmeticTarget {
     A,
     B,
@@ -90,21 +98,41 @@ enum ArithmeticTarget {
 
 struct CPU {
     registers: Registers,
+    pc: u16,
+    bus: MemoryBus,
+}
+
+struct MemoryBus {
+    mem: [u8; 0xffff],
+}
+
+impl MemoryBus {
+    fn read_byte(&self, address: u16) -> u8 {
+        self.mem[address as usize]
+    }
 }
 
 impl CPU {
-    fn execute(&mut self, instr: Instruction) {
+    fn execute(&mut self, instr: Instruction) -> u16 {
         match instr {
             Instruction::ADD(target) => {
                 match target {
                     ArithmeticTarget::C => {
-                        // TODO: implement add on C
+                        let val = self.registers.a;
+                        let new_val = self.add(val);
+                        self.registers.a = new_val;
+                        self.pc.wrapping_add(1)
                     }
-                    _ => { // TODO: more targets
+                    _ => {
+                        // TODO: more targets
+                        self.pc
                     }
                 }
             }
-            _ => { /* TODO: supp more instructions */ }
+            _ => {
+                /* TODO: supp more instructions */
+                self.pc
+            }
         }
     }
 
@@ -115,6 +143,17 @@ impl CPU {
         self.registers.f.carry = did_overflow;
         self.registers.f.half_carry = (self.registers.a & 0xf) + (val & 0xf) > 0xf;
         new_val
+    }
+
+    fn step(&mut self) {
+        let mut instr_byte = self.bus.read_byte(self.pc);
+        let next_pc = if let Some(instr) = Instruction::from_byte(instr_byte) {
+            self.execute(instr)
+        } else {
+            panic!("Unknown instruction found for: 0x{:x}", instr_byte);
+        };
+
+        self.pc = next_pc;
     }
 }
 
